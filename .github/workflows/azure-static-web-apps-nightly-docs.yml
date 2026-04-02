@@ -1,73 +1,73 @@
 name: Nightly Docs
-
-on:
+'on':
   push:
     branches:
-      - main
+    - main
   pull_request_target:
-    types: [opened, synchronize, reopened, closed, labeled, unlabeled]
-
+    types:
+    - opened
+    - synchronize
+    - reopened
+    - closed
+    - labeled
+    - unlabeled
 jobs:
   build_and_deploy_docs:
-    if: (github.event_name == 'push' || (github.event_name == 'pull_request_target' && github.event.action != 'closed' && github.event.action != 'unlabeled' && contains(github.event.pull_request.labels.*.name, 'pr-generate-docs-preview'))) && github.repository_owner == 'GmodNET'
+    if: (github.event_name == 'push' || (github.event_name == 'pull_request_target'
+      && github.event.action != 'closed' && github.event.action != 'unlabeled' &&
+      contains(github.event.pull_request.labels.*.name, 'pr-generate-docs-preview')))
+      && github.repository_owner == 'playground-nils'
     runs-on: ubuntu-latest
     name: Build and Deploy Nightly Docs
     steps:
-      - name: Checkout branch
-        if: github.event_name == 'push'
-        uses: actions/checkout@v2.3.4
+    - name: Checkout branch
+      if: github.event_name == 'push'
+      uses: actions/checkout@v2.3.4
+    - name: Checkout PR
+      if: github.event_name != 'push'
+      run: 'gh repo clone GmodNET/GmodDotNet ./
 
-      - name: Checkout PR
-        if: github.event_name != 'push'
-        run: |
-             gh repo clone GmodNET/GmodDotNet ./
-             gh pr checkout ${{ github.event.number }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        gh pr checkout ${{ github.event.number }}
 
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v3.0.3
-        with:
-          global-json-file: "./global.json"
-
-      - name: Restore dotnet tools
-        run: dotnet tool restore
-
-      # We force DocFX to use latest runtime (and latest SDK) by setting DOTNET_ROLL_FORWARD='LatestMajor' env var
-      - name: Build docs with DocFX
-        shell: pwsh
-        run: |
-             $env:GITHUB_ACTIONS='false'
-             $env:DOTNET_ROLL_FORWARD='LatestMajor' 
-             dotnet docfx ./docfx_project/docfx.json
-
-      - name: Upload docs as artifact
-        uses: actions/upload-artifact@v2.2.4
-        with:
-          name: site
-          path: docfx_project/_site/
-
-      - name: Deploy docs
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_HILL_0F19B7C03 }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
-          action: "upload"
-          ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
-          # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: "./docfx_project/_site/" # App source code path
-          api_location: "" # Api source code path - optional
-          output_location: "" # Built app content directory - optional
-          skip_app_build: true
-          ###### End of Repository/Build Configurations ######
-
+        '
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v3.0.3
+      with:
+        global-json-file: ./global.json
+    - name: Restore dotnet tools
+      run: dotnet tool restore
+    - name: Build docs with DocFX
+      shell: pwsh
+      run: "$env:GITHUB_ACTIONS='false'\n$env:DOTNET_ROLL_FORWARD='LatestMajor' \n\
+        dotnet docfx ./docfx_project/docfx.json\n"
+    - name: Upload docs as artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: site
+        path: docfx_project/_site/
+    - name: Deploy docs
+      uses: Azure/static-web-apps-deploy@v1
+      with:
+        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_HILL_0F19B7C03
+          }}
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        action: upload
+        app_location: ./docfx_project/_site/
+        api_location: ''
+        output_location: ''
+        skip_app_build: true
   remove_docs_pr_preview:
-    if: github.event_name == 'pull_request_target' && (github.event.action == 'closed' || (github.event.action == 'unlabeled' && github.event.label.name == 'pr-generate-docs-preview')) && github.repository_owner == 'GmodNET'
+    if: github.event_name == 'pull_request_target' && (github.event.action == 'closed'
+      || (github.event.action == 'unlabeled' && github.event.label.name == 'pr-generate-docs-preview'))
+      && github.repository_owner == 'playground-nils'
     runs-on: ubuntu-latest
     name: Close Pull Request Docs
     steps:
-      - name: Close Pull Request
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_HILL_0F19B7C03 }}
-          action: "close"
+    - name: Close Pull Request
+      uses: Azure/static-web-apps-deploy@v1
+      with:
+        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AMBITIOUS_HILL_0F19B7C03
+          }}
+        action: close
