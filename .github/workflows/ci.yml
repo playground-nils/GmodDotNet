@@ -1,57 +1,55 @@
 name: CI
-
-on:
-  pull_request:
+'on':
+  pull_request: null
   push:
-    branches:
+    branches: null
   release:
-    types: [published]
-
+    types:
+    - published
 env:
-  GMODNET_VERSION: '0.6.0'
-
+  GMODNET_VERSION: 0.6.0
 jobs:
- linux-build:
-
-   runs-on: ubuntu-20.04
-
-   steps:
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
     - name: Checkout
       uses: actions/checkout@v2.3.4
-
     - name: Setup .NET Core SDK
       uses: actions/setup-dotnet@v1.8.1
-
     - name: Build Gmod.NET
       run: dotnet build runtime.csproj -c Release
-
     - name: Upload build artifacts
       uses: actions/upload-artifact@v1.0.0
       with:
         name: Linux-Raw-Build
         path: ./build
-
     - name: Upload nupkgs
       uses: actions/upload-artifact@v1.0.0
       with:
         name: nupkgs
         path: nupkgs
-
     - name: Download Steam and Install Garry's Mod Dedicated Server
-      run: |
-           wget https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
-           tar -xvzf steamcmd_linux.tar.gz
-           rm -rfv steamcmd_linux.tar.gz
-           ./steamcmd.sh +login anonymous +force_install_dir gmod "+app_update 4020 -beta x86-64 validate" +quit
+      run: 'wget https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
 
+        tar -xvzf steamcmd_linux.tar.gz
+
+        rm -rfv steamcmd_linux.tar.gz
+
+        ./steamcmd.sh +login anonymous +force_install_dir gmod "+app_update 4020 -beta
+        x86-64 validate" +quit
+
+        '
     - name: Prepare test run
-      run: |
-           dotnet publish gm_dotnet_managed/Tests/Tests.csproj -c Release -o gmod/garrysmod/lua/bin/Modules/Tests
-           cp -a build/. gmod/garrysmod/lua/bin
-           cp lua/Tests/run_tests.lua gmod/garrysmod/lua/autorun
+      run: 'dotnet publish gm_dotnet_managed/Tests/Tests.csproj -c Release -o gmod/garrysmod/lua/bin/Modules/Tests
 
+        cp -a build/. gmod/garrysmod/lua/bin
+
+        cp lua/Tests/run_tests.lua gmod/garrysmod/lua/autorun
+
+        '
     - name: Run Garry's Mod
-      run: ./srcds_run_x64 -game garrysmod -systemtest -condebug +sv_hibernate_think 1 || true
+      run: ./srcds_run_x64 -game garrysmod -systemtest -condebug +sv_hibernate_think
+        1 || true
       working-directory: ./gmod/
       timeout-minutes: 1
       continue-on-error: true
@@ -59,386 +57,406 @@ jobs:
         COREHOST_TRACE: 1
         COREHOST_TRACE_VERBOSITY: 4
         COREHOST_TRACEFILE: corehost_trace.txt
-
     - name: Print Corehost trace
       working-directory: ./gmod/
       run: cat corehost_trace.txt
-
     - name: Print console log
       run: cat gmod/garrysmod/console.log
-
     - name: Print test log
       run: cat gmod/tests-log.txt
-
     - name: Check if tests were successful
       run: mv gmod/tests-success.txt gmod/tests.txt
-
     - name: Upload test log
       uses: actions/upload-artifact@v1.0.0
       with:
         name: Linux-Test-Log
         path: gmod/tests-log.txt
-
-# Finilize nightly build for push event
-
     - name: Download GMS
-      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-      run: |
-           wget https://github.com/GlebChili/GmodNetModuleSigner/releases/download/1.0.0/gms
-           chmod +x gms
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      run: 'wget https://github.com/GlebChili/GmodNetModuleSigner/releases/download/1.0.0/gms
 
+        chmod +x gms
+
+        '
     - name: Download signature key
-      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
       env:
         GITHUB_TOKEN: ${{ secrets.GMOD_NET_PRIVATE_KEY_REPO_TOKEN }}
       run: git clone https://GlebChili:$GITHUB_TOKEN@github.com/GlebChili/GmodDotNetPrivateKey.git
-
     - name: Sign assemblies
-      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-      run: |
-           cd build
-           ./../gms --sign=gmcl_dotnet_linux64.dll --key=../GmodDotNetPrivateKey/gmodnet-private.modulekey --version=$GMODNET_VERSION
-           mv signature.modulesign gmcl_dotnet.modulesign
-           cp ../GmodDotNetPrivateKey/gmodnet-public.modulekey .
-           mv gmodnet-public.modulekey gmcl_dotnet.modulekey
-           cd gmodnet
-           ./../../gms --sign=GmodNET.dll --key=../../GmodDotNetPrivateKey/gmodnet-private.modulekey --version=$GMODNET_VERSION
-           mv signature.modulesign GmodNET.modulesign
-           cp ../../GmodDotNetPrivateKey/gmodnet-public.modulekey .
-           mv gmodnet-public.modulekey GmodNET.modulekey
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      run: 'cd build
 
+        ./../gms --sign=gmcl_dotnet_linux64.dll --key=../GmodDotNetPrivateKey/gmodnet-private.modulekey
+        --version=$GMODNET_VERSION
+
+        mv signature.modulesign gmcl_dotnet.modulesign
+
+        cp ../GmodDotNetPrivateKey/gmodnet-public.modulekey .
+
+        mv gmodnet-public.modulekey gmcl_dotnet.modulekey
+
+        cd gmodnet
+
+        ./../../gms --sign=GmodNET.dll --key=../../GmodDotNetPrivateKey/gmodnet-private.modulekey
+        --version=$GMODNET_VERSION
+
+        mv signature.modulesign GmodNET.modulesign
+
+        cp ../../GmodDotNetPrivateKey/gmodnet-public.modulekey .
+
+        mv gmodnet-public.modulekey GmodNET.modulekey
+
+        '
     - name: Pack build
-      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
       env:
         TRAVIS_COMMIT: ${{ github.sha }}
-      run: |
-           cd build
-           tar czfv ../linux-$TRAVIS_COMMIT.tar.gz .
+      run: 'cd build
 
+        tar czfv ../linux-$TRAVIS_COMMIT.tar.gz .
+
+        '
     - name: Pack with MSBuild
-      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
       run: dotnet build runtime.csproj -target:PackRuntimeBuild
-
     - name: Upload versioned build as artifact
-      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
       uses: actions/upload-artifact@v1.0.0
       with:
         name: linux-versioned-build
         path: packed-build
-
- windows-build:
-
-   runs-on: windows-2019
-
-   steps:
-     - name: Checkout
-       uses: actions/checkout@v2.3.4
-
-     - name: Setup .NET Core SDK
-       uses: actions/setup-dotnet@v1.8.1
-
-     - name: Build Gmod.NET
-       run: dotnet build runtime.csproj -c Release
-
-     - name: Upload build artifacts
-       uses: actions/upload-artifact@v1.0.0
-       with:
-         name: Windows-Raw-Build
-         path: ./build
-
-     - name: Download Steam and Install Garry's Mod Dedicated Server
-       shell: bash
-       run: |
-            curl https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip -O -L
-            powershell -Command 'Expand-Archive -LiteralPath ./steamcmd.zip -DestinationPath ./'
-            ./steamcmd.exe +login anonymous +force_install_dir gmod "+app_update 4020 -beta x86-64 validate" +quit || true
-
-     - name: Prepare test run
-       shell: bash
-       run: |
-            dotnet publish gm_dotnet_managed/Tests/Tests.csproj -c Release -o gmod/garrysmod/lua/bin/Modules/Tests
-            cp -a build/. gmod/garrysmod/lua/bin
-            cp lua/Tests/run_tests.lua gmod/garrysmod/lua/autorun
-
-     - name: Run Garry's Mod
-       shell: pwsh
-       run: |
-            ./gmod/srcds_win64.exe -console -systemtest -condebug -game "garrysmod" +exec "server.cfg" +gamemode sandbox +map gm_construct +maxplayers 16 +sv_hibernate_think 1
-            Wait-Process -Name srcds_win64
-       timeout-minutes: 5
-       continue-on-error: true
-       env:
-         COREHOST_TRACE: 1
-         COREHOST_TRACE_VERBOSITY: 4
-         COREHOST_TRACEFILE: corehost_trace.txt
-
-     - name: Print Corehost trace
-       working-directory: ./gmod/
-       run: cat corehost_trace.txt
-
-     - name: Print console log
-       run: cat gmod/garrysmod/console.log
-
-     - name: Print test log
-       shell: bash
-       run: cat gmod/tests-log.txt
-
-     - name: Check if tests were successful
-       shell: bash
-       run: mv gmod/tests-success.txt gmod/tests.txt
-
-     - name: Upload test log
-       uses: actions/upload-artifact@v1.0.0
-       with:
-         name: Windows-Test-Log
-         path: gmod/tests-log.txt
-
-    # Finilize full signed build on push
-
-     - name: Download GMS
-       if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-       shell: bash
-       run: curl -O -L https://github.com/GlebChili/GmodNetModuleSigner/releases/download/1.0.0/gms.exe
-
-     - name: Download signature key
-       if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-       shell: bash
-       env:
-         GITHUB_TOKEN: ${{ secrets.GMOD_NET_PRIVATE_KEY_REPO_TOKEN }}
-       run: git clone https://GlebChili:$GITHUB_TOKEN@github.com/GlebChili/GmodDotNetPrivateKey.git
-
-     - name: Sign assemblies
-       if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-       shell: bash
-       run: |
-            cd build
-            ./../gms.exe --sign=gmcl_dotnet_win64.dll --key=../GmodDotNetPrivateKey/gmodnet-private.modulekey --version=$GMODNET_VERSION
-            mv signature.modulesign gmcl_dotnet.modulesign
-            cp ../GmodDotNetPrivateKey/gmodnet-public.modulekey .
-            mv gmodnet-public.modulekey gmcl_dotnet.modulekey
-            cd gmodnet
-            ./../../gms.exe --sign=GmodNET.dll --key=../../GmodDotNetPrivateKey/gmodnet-private.modulekey --version=$GMODNET_VERSION
-            mv signature.modulesign GmodNET.modulesign
-            cp ../../GmodDotNetPrivateKey/gmodnet-public.modulekey .
-            mv gmodnet-public.modulekey GmodNET.modulekey
-
-     - name: Pack with MSBuild
-       if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-       run: dotnet build runtime.csproj -target:PackRuntimeBuild
-
-     - name: Upload versioned build as artifact
-       if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-       uses: actions/upload-artifact@v1.0.0
-       with:
-         name: windows-versioned-build
-         path: packed-build
-
- mac-build:
-
-    runs-on: macos-10.15
-
+  windows-build:
+    runs-on: windows-latest
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2.3.4
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v1.8.1
+    - name: Build Gmod.NET
+      run: dotnet build runtime.csproj -c Release
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: Windows-Raw-Build
+        path: ./build
+    - name: Download Steam and Install Garry's Mod Dedicated Server
+      shell: bash
+      run: 'curl https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip -O
+        -L
 
-      - name: Checkout
-        uses: actions/checkout@v2.3.4
+        powershell -Command ''Expand-Archive -LiteralPath ./steamcmd.zip -DestinationPath
+        ./''
 
-      - name: Setup .NET Core SDK
-        uses: actions/setup-dotnet@v1.8.1
+        ./steamcmd.exe +login anonymous +force_install_dir gmod "+app_update 4020
+        -beta x86-64 validate" +quit || true
 
-      - name: Build Gmod.NET
-        run: dotnet build runtime.csproj -c Release
+        '
+    - name: Prepare test run
+      shell: bash
+      run: 'dotnet publish gm_dotnet_managed/Tests/Tests.csproj -c Release -o gmod/garrysmod/lua/bin/Modules/Tests
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v1.0.0
-        with:
-          name: Osx-Raw-Build
-          path: ./build
+        cp -a build/. gmod/garrysmod/lua/bin
 
-# Finilize full signed build on push
+        cp lua/Tests/run_tests.lua gmod/garrysmod/lua/autorun
 
-      - name: Download GMS
-        if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-        run: |
-             curl -O -L https://github.com/GlebChili/GmodNetModuleSigner/releases/download/1.0.0/gms-osx
-             chmod +x gms-osx
+        '
+    - name: Run Garry's Mod
+      shell: pwsh
+      run: './gmod/srcds_win64.exe -console -systemtest -condebug -game "garrysmod"
+        +exec "server.cfg" +gamemode sandbox +map gm_construct +maxplayers 16 +sv_hibernate_think
+        1
 
-      - name: Download signature key
-        if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GMOD_NET_PRIVATE_KEY_REPO_TOKEN }}
-        run: git clone https://GlebChili:$GITHUB_TOKEN@github.com/GlebChili/GmodDotNetPrivateKey.git
+        Wait-Process -Name srcds_win64
 
-      - name: Sign assemblies
-        if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-        run: |
-             cd build
-             ./../gms-osx --sign=gmcl_dotnet_osx64.dll --key=../GmodDotNetPrivateKey/gmodnet-private.modulekey --version=$GMODNET_VERSION
-             mv signature.modulesign gmcl_dotnet.modulesign
-             cp ../GmodDotNetPrivateKey/gmodnet-public.modulekey .
-             mv gmodnet-public.modulekey gmcl_dotnet.modulekey
-             cd gmodnet
-             ./../../gms-osx --sign=GmodNET.dll --key=../../GmodDotNetPrivateKey/gmodnet-private.modulekey --version=$GMODNET_VERSION
-             mv signature.modulesign GmodNET.modulesign
-             cp ../../GmodDotNetPrivateKey/gmodnet-public.modulekey .
-             mv gmodnet-public.modulekey GmodNET.modulekey
+        '
+      timeout-minutes: 5
+      continue-on-error: true
+      env:
+        COREHOST_TRACE: 1
+        COREHOST_TRACE_VERBOSITY: 4
+        COREHOST_TRACEFILE: corehost_trace.txt
+    - name: Print Corehost trace
+      working-directory: ./gmod/
+      run: cat corehost_trace.txt
+    - name: Print console log
+      run: cat gmod/garrysmod/console.log
+    - name: Print test log
+      shell: bash
+      run: cat gmod/tests-log.txt
+    - name: Check if tests were successful
+      shell: bash
+      run: mv gmod/tests-success.txt gmod/tests.txt
+    - name: Upload test log
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: Windows-Test-Log
+        path: gmod/tests-log.txt
+    - name: Download GMS
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      shell: bash
+      run: curl -O -L https://github.com/GlebChili/GmodNetModuleSigner/releases/download/1.0.0/gms.exe
+    - name: Download signature key
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GMOD_NET_PRIVATE_KEY_REPO_TOKEN }}
+      run: git clone https://GlebChili:$GITHUB_TOKEN@github.com/GlebChili/GmodDotNetPrivateKey.git
+    - name: Sign assemblies
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      shell: bash
+      run: 'cd build
 
-      - name: Pack with MSBuild
-        if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-        run: dotnet build runtime.csproj -target:PackRuntimeBuild
+        ./../gms.exe --sign=gmcl_dotnet_win64.dll --key=../GmodDotNetPrivateKey/gmodnet-private.modulekey
+        --version=$GMODNET_VERSION
 
-      - name: Upload versioned build as artifact
-        if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-        uses: actions/upload-artifact@v1.0.0
-        with:
-          name: osx-versioned-build
-          path: packed-build
+        mv signature.modulesign gmcl_dotnet.modulesign
 
- trigger_autorebase:
+        cp ../GmodDotNetPrivateKey/gmodnet-public.modulekey .
 
-   runs-on: ubuntu-20.04
+        mv gmodnet-public.modulekey gmcl_dotnet.modulekey
 
-   needs: [linux-build, windows-build, mac-build]
+        cd gmodnet
 
-   if: ${{ github.event_name == 'push' && github.repository_owner == 'GmodNET' }}
+        ./../../gms.exe --sign=GmodNET.dll --key=../../GmodDotNetPrivateKey/gmodnet-private.modulekey
+        --version=$GMODNET_VERSION
 
-   steps:
+        mv signature.modulesign GmodNET.modulesign
 
-     - name: Generate GitHub App token
-       id: generate_token
-       uses: tibdex/github-app-token@v1.3.0
-       with:
-         app_id: ${{ secrets.GMODNET_GITHUB_BOT_ID }}
-         private_key: ${{ secrets.GMODNET_GITHUB_BOT_KEY }}
+        cp ../../GmodDotNetPrivateKey/gmodnet-public.modulekey .
 
-     - name: Trigger auto rebase
-       uses: GmodNET/RebaseWorkflowStarterAction@v1.0.0
-       with:
-         token: ${{ steps.generate_token.outputs.token }}
-         worflow_id: rebase-pr-workflow.yml
-         pr_label_name: pr-autorebase
+        mv gmodnet-public.modulekey GmodNET.modulekey
 
- deploy-and-notify:
-
-    runs-on: ubuntu-20.04
-
-    needs: [linux-build, windows-build, mac-build]
-
-    if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET' }}
-
+        '
+    - name: Pack with MSBuild
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      run: dotnet build runtime.csproj -target:PackRuntimeBuild
+    - name: Upload versioned build as artifact
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: windows-versioned-build
+        path: packed-build
+  mac-build:
+    runs-on: macos-latest
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2.3.4
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v1.8.1
+    - name: Build Gmod.NET
+      run: dotnet build runtime.csproj -c Release
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: Osx-Raw-Build
+        path: ./build
+    - name: Download GMS
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      run: 'curl -O -L https://github.com/GlebChili/GmodNetModuleSigner/releases/download/1.0.0/gms-osx
 
-      - name: Checkout repository
-        uses: actions/checkout@v2.3.4
+        chmod +x gms-osx
 
-      - name: Setup .NET Core SDK
-        uses: actions/setup-dotnet@v1.8.1
+        '
+    - name: Download signature key
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GMOD_NET_PRIVATE_KEY_REPO_TOKEN }}
+      run: git clone https://GlebChili:$GITHUB_TOKEN@github.com/GlebChili/GmodDotNetPrivateKey.git
+    - name: Sign assemblies
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      run: 'cd build
 
-      - name: Prepare folders
-        run: |
-             mkdir publish
-             mkdir versioned-publish
-             mkdir nuget-publish
-             cd publish
-             mkdir windows
-             mkdir osx
+        ./../gms-osx --sign=gmcl_dotnet_osx64.dll --key=../GmodDotNetPrivateKey/gmodnet-private.modulekey
+        --version=$GMODNET_VERSION
 
-      - name: Download versioned build (windows)
-        uses: actions/download-artifact@v1.0.0
-        with:
-          name: windows-versioned-build
-          path: versioned-publish
+        mv signature.modulesign gmcl_dotnet.modulesign
 
-      - name: Download versioned build (linux)
-        uses: actions/download-artifact@v1.0.0
-        with:
-          name: linux-versioned-build
-          path: versioned-publish
+        cp ../GmodDotNetPrivateKey/gmodnet-public.modulekey .
 
-      - name: Download versioned build (osx)
-        uses: actions/download-artifact@v1.0.0
-        with:
-          name: osx-versioned-build
-          path: versioned-publish
+        mv gmodnet-public.modulekey gmcl_dotnet.modulekey
 
-      - name: Download nuget packages from previous stage
-        uses: actions/download-artifact@v1.0.0
-        with:
-          name: nupkgs
-          path: nuget-publish
+        cd gmodnet
 
-      - name: Upload API nuget package to Azure DevOps
-        run: |
-             dotnet nuget update source gmodnet-packages --username CI --password ${{ secrets.AZURE_DEVOPS_ARTIFACTS_PAT }} --store-password-in-clear-text
-             dotnet nuget push nuget-publish/**.nupkg --source gmodnet-packages --api-key az --skip-duplicate
+        ./../../gms-osx --sign=GmodNET.dll --key=../../GmodDotNetPrivateKey/gmodnet-private.modulekey
+        --version=$GMODNET_VERSION
 
-      - name: Upload NuGet package to NuGet.org
-        if: ${{ github.event_name == 'release' }}
-        run: dotnet nuget push nuget-publish/**.nupkg --source nuget --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+        mv signature.modulesign GmodNET.modulesign
 
-      - name: Upload stable build to GitHub release
-        if: ${{ github.event_name == 'release' }}
-        uses: svenstaro/upload-release-action@2.2.1
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: versioned-publish/*
-          overwrite: true
-          tag: ${{ github.ref }}
-          file_glob: true
+        cp ../../GmodDotNetPrivateKey/gmodnet-public.modulekey .
 
-      - name: Restore dotnet version tool
-        if: ${{ github.event_name == 'push' }}
-        run: dotnet tool restore
+        mv gmodnet-public.modulekey GmodNET.modulekey
 
-      - name: Generate token for GmodNET/runtime-nightly repo
-        if: ${{ github.event_name == 'push' }}
-        id: generate_token_for_github_nightly
-        uses: tibdex/github-app-token@v1.3.0
-        with:
-          app_id: ${{ secrets.GMODNET_GITHUB_BOT_ID }}
-          private_key: ${{ secrets.GMODNET_GITHUB_BOT_KEY }}
-          repository: GmodNET/runtime-nightly
+        '
+    - name: Pack with MSBuild
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      run: dotnet build runtime.csproj -target:PackRuntimeBuild
+    - name: Upload versioned build as artifact
+      if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'GmodNET'
+        }}
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: osx-versioned-build
+        path: packed-build
+  trigger_autorebase:
+    runs-on: ubuntu-latest
+    needs:
+    - linux-build
+    - windows-build
+    - mac-build
+    if: ${{ github.event_name == 'push' && github.repository_owner == 'playground-nils'
+      }}
+    steps:
+    - name: Generate GitHub App token
+      id: generate_token
+      uses: tibdex/github-app-token@v1.3.0
+      with:
+        app_id: ${{ secrets.GMODNET_GITHUB_BOT_ID }}
+        private_key: ${{ secrets.GMODNET_GITHUB_BOT_KEY }}
+    - name: Trigger auto rebase
+      uses: GmodNET/RebaseWorkflowStarterAction@v1.0.0
+      with:
+        token: ${{ steps.generate_token.outputs.token }}
+        worflow_id: rebase-pr-workflow.yml
+        pr_label_name: pr-autorebase
+  deploy-and-notify:
+    runs-on: ubuntu-latest
+    needs:
+    - linux-build
+    - windows-build
+    - mac-build
+    if: ${{ github.event_name != 'pull_request' && github.repository_owner == 'playground-nils'
+      }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2.3.4
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v1.8.1
+    - name: Prepare folders
+      run: 'mkdir publish
 
-      - name: Get current version
-        if: ${{ github.event_name == 'push' }}
-        id: get_version
-        run: echo "::set-output name=version::$(dotnet gmodnet-vt getVersion version.json --skip-build-data)"
+        mkdir versioned-publish
 
-      - name: Get current head
-        if: ${{ github.event_name == 'push' }}
-        id: get_git_head
-        run: echo "::set-output name=head_name::'$(dotnet gmodnet-vt getBranchName version.json)'"
+        mkdir nuget-publish
 
-      - name: Add new git remote for nightly builds
-        if: ${{ github.event_name == 'push' }}
-        run: |
-             git fetch --unshallow origin
-             git config --local --unset-all http.https://github.com/.extraheader
-             git remote add nightly https://x-access-token:${{ steps.generate_token_for_github_nightly.outputs.token }}@github.com/GmodNET/runtime-nightly.git
+        cd publish
 
-      - name: Apply git tag
-        if: ${{ github.event_name == 'push' }}
-        run: git tag ${{ steps.get_version.outputs.version }}
+        mkdir windows
 
-      - name: Push tag to nightly builds repo
-        if: ${{ github.event_name == 'push' }}
-        run: git push nightly ${{ steps.get_version.outputs.version }} --force
+        mkdir osx
 
-      - name: Upload build artifacts to nightly repo releases
-        if: ${{ github.event_name == 'push' }}
-        uses: svenstaro/upload-release-action@2.2.1
-        with:
-          repo_token: ${{ steps.generate_token_for_github_nightly.outputs.token }}
-          repo_name: GmodNET/runtime-nightly
-          file: versioned-publish/*
-          overwrite: true
-          tag: ${{ steps.get_version.outputs.version }}
-          file_glob: true
+        '
+    - name: Download versioned build (windows)
+      uses: actions/download-artifact@v1.0.0
+      with:
+        name: windows-versioned-build
+        path: versioned-publish
+    - name: Download versioned build (linux)
+      uses: actions/download-artifact@v1.0.0
+      with:
+        name: linux-versioned-build
+        path: versioned-publish
+    - name: Download versioned build (osx)
+      uses: actions/download-artifact@v1.0.0
+      with:
+        name: osx-versioned-build
+        path: versioned-publish
+    - name: Download nuget packages from previous stage
+      uses: actions/download-artifact@v1.0.0
+      with:
+        name: nupkgs
+        path: nuget-publish
+    - name: Upload API nuget package to Azure DevOps
+      run: 'dotnet nuget update source gmodnet-packages --username CI --password ${{
+        secrets.AZURE_DEVOPS_ARTIFACTS_PAT }} --store-password-in-clear-text
 
-      - name: Send Discord message
-        if: ${{ github.event_name == 'push' }}
-        working-directory: csx
-        env:
-          DOTNET_ROLL_FORWARD: Major
-        run: |
-             dotnet tool restore
-             dotnet script discord-webhook.csx ${{ secrets.DISCORD_WEBHOOK }} ${{ github.sha }} ${{ steps.get_git_head.outputs.head_name }} ${{ steps.get_version.outputs.version }}
+        dotnet nuget push nuget-publish/**.nupkg --source gmodnet-packages --api-key
+        az --skip-duplicate
+
+        '
+    - name: Upload NuGet package to NuGet.org
+      if: ${{ github.event_name == 'release' }}
+      run: dotnet nuget push nuget-publish/**.nupkg --source nuget --api-key ${{ secrets.NUGET_API_KEY
+        }} --skip-duplicate
+    - name: Upload stable build to GitHub release
+      if: ${{ github.event_name == 'release' }}
+      uses: svenstaro/upload-release-action@2.2.1
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: versioned-publish/*
+        overwrite: true
+        tag: ${{ github.ref }}
+        file_glob: true
+    - name: Restore dotnet version tool
+      if: ${{ github.event_name == 'push' }}
+      run: dotnet tool restore
+    - name: Generate token for GmodNET/runtime-nightly repo
+      if: ${{ github.event_name == 'push' }}
+      id: generate_token_for_github_nightly
+      uses: tibdex/github-app-token@v1.3.0
+      with:
+        app_id: ${{ secrets.GMODNET_GITHUB_BOT_ID }}
+        private_key: ${{ secrets.GMODNET_GITHUB_BOT_KEY }}
+        repository: GmodNET/runtime-nightly
+    - name: Get current version
+      if: ${{ github.event_name == 'push' }}
+      id: get_version
+      run: echo "::set-output name=version::$(dotnet gmodnet-vt getVersion version.json
+        --skip-build-data)"
+    - name: Get current head
+      if: ${{ github.event_name == 'push' }}
+      id: get_git_head
+      run: echo "::set-output name=head_name::'$(dotnet gmodnet-vt getBranchName version.json)'"
+    - name: Add new git remote for nightly builds
+      if: ${{ github.event_name == 'push' }}
+      run: 'git fetch --unshallow origin
+
+        git config --local --unset-all http.https://github.com/.extraheader
+
+        git remote add nightly https://x-access-token:${{ steps.generate_token_for_github_nightly.outputs.token
+        }}@github.com/GmodNET/runtime-nightly.git
+
+        '
+    - name: Apply git tag
+      if: ${{ github.event_name == 'push' }}
+      run: git tag ${{ steps.get_version.outputs.version }}
+    - name: Push tag to nightly builds repo
+      if: ${{ github.event_name == 'push' }}
+      run: git push nightly ${{ steps.get_version.outputs.version }} --force
+    - name: Upload build artifacts to nightly repo releases
+      if: ${{ github.event_name == 'push' }}
+      uses: svenstaro/upload-release-action@2.2.1
+      with:
+        repo_token: ${{ steps.generate_token_for_github_nightly.outputs.token }}
+        repo_name: GmodNET/runtime-nightly
+        file: versioned-publish/*
+        overwrite: true
+        tag: ${{ steps.get_version.outputs.version }}
+        file_glob: true
+    - name: Send Discord message
+      if: ${{ github.event_name == 'push' }}
+      working-directory: csx
+      env:
+        DOTNET_ROLL_FORWARD: Major
+      run: 'dotnet tool restore
+
+        dotnet script discord-webhook.csx ${{ secrets.DISCORD_WEBHOOK }} ${{ github.sha
+        }} ${{ steps.get_git_head.outputs.head_name }} ${{ steps.get_version.outputs.version
+        }}
+
+        '
